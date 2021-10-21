@@ -1,0 +1,190 @@
+to create table
+CREATE TABLE book (
+  title varchar(100),
+  isbn varchar(50),
+  pages integer,
+  price money,
+  description varchar(256),
+  publisher varchar(100)
+);
+////
+
+to add smth in it
+INSERT INTO book VALUES (
+  'Postgres for Beginners',
+  '0-5980-6249-1',
+  25,
+  4.99,
+  'Learn Postgres the Easy Way',
+  'Codecademy Publishing'
+);
+////
+
+to select smth
+SELECT * FROM book WHERE title = 'Postgres for Beginners';
+
+SELECT * FROM book WHERE isbn = '0-5980-6249-1';
+////
+
+primary key:
+
+CREATE TABLE book (
+  title varchar(100),
+  isbn varchar(50) PRIMARY KEY,  <-------------
+  pages integer,
+  price money,
+  description varchar(256),
+  publisher varchar(100)
+);
+/////////////////////////////////
+узнать ограничения, наложенные на определенные столбцы в таблице, например recipe:
+
+SELECT
+  constraint_name, table_name, column_name - constraint_name <--- Чей ключ?!?
+FROM
+  information_schema.key_column_usage  <---- Эта штука узнает pk
+WHERE
+  table_name = 'recipe';
+
+ constraint_name | table_name | column_name 
+-----------------+------------+-------------
+ recipe_pkey     | recipe     | id
+(1 row)
+///////////////////////////////////
+Иногда ни один из столбцов в таблице не может однозначно идентифицировать запись. 
+Когда это происходит, мы можем назначить несколько столбцов в таблице, которые будут служить первичным ключом, также известным как составной первичный ключ. 
+
+ author_name |      book_title      
+-------------+----------------------
+ Liz Key     | Postgres Made Easy
+ Liz Key     | Postgres for Dummies
+ Tom Index   | Postgres Made Easy
+ Tom Index   | Beginner Postgres
+
+Чтобы назначить несколько столбцов составным первичным ключом:
+CREATE TABLE popular_recipes (
+  recipe_id varchar(20),
+  ingredient_id varchar(20),
+  downloaded integer,
+  PRIMARY KEY (recipe_id, ingredient_id) <------
+);
+////
+CREATE TABLE popular_books(
+  book_title varchar(100),
+  author_name varchar(50),
+  number_sold integer,
+  number_previewed integer,
+  PRIMARY KEY (book_title, author_name)
+);
+
+SELECT constraint_name, table_name, column_name
+FROM information_schema.key_column_usage
+WHERE table_name = 'popular_books';
+// output
+constraint_name	    table_name	    column_name
+popular_books_pkey	popular_books	  book_title
+popular_books_pkey	popular_books	  author_name
+/////////////////////////////////////////
+Требуется ли для создания emailзаписи наличие действующей personзаписи? 
+Обычно это так, поскольку мы не должны создавать адрес электронной почты для несуществующего человека. 
+Следовательно, мы должны поместить внешний ключ в email таблицу, чтобы гарантировать, 
+что действительная запись в personтаблице должна существовать до добавления записи в email таблицу.
+
+CREATE TABLE person (
+  id integer PRIMARY KEY,
+  name varchar(20),
+  age integer
+);
+ 
+CREATE TABLE email (
+  email varchar(20) PRIMARY KEY,
+  person_id integer REFERENCES person(id),
+  storage integer,
+  price money
+);
+//////////////////////////////////
+foreign key:
+
+CREATE TABLE book (
+  title varchar(100),
+  isbn varchar(50) PRIMARY KEY,
+  pages integer,
+  price money,
+  description varchar(256),
+  publisher varchar(100)
+);
+
+CREATE TABLE chapter (
+  id integer PRIMARY KEY,
+  number integer,
+  title varchar(50),
+  content varchar(1024),
+  book_isbn varchar(50) REFERENCES book(isbn)
+);
+
+SELECT constraint_name, table_name, column_name
+FROM information_schema.key_column_usage
+WHERE table_name = 'chapter';
+////
+
+SELECT * FROM book;
+SELECT * FROM chapter;
+
+SELECT book.title AS book, chapter.title AS chapters
+FROM book, chapter
+WHERE book.isbn = chapter.book_isbn; <----- output table with books and this chapters, because of pk in books and fk in chapter
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
