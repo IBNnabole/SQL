@@ -300,29 +300,119 @@ JOIN
 ON
     author.email = books_authors.author_email;
 
+//////////////////////////////////////////////// constraints
+NOT NULL
+мы можем отклонить вставки и обновления, которые не включают данные для определенных столбцов, добавив NOT NULLограничение для этих столбцов.
+
+CREATE TABLE talks (
+    id integer,
+    title varchar NOT NULL,
+    speaker_id integer NOT NULL,
+    estimated_length integer,
+    session_timeslot timestamp NOT NULL
+);// if u will write like that, and dont add all columns in insert, u will have an error
+
+all constraints we can add with ALTER TABLE
+
+ALTER TABLE talks
+ALTER COLUMN session_timeslot SET NOT NULL; // to set constraints
+
+ALTER TABLE talks
+ALTER COLUMN session_timeslot DROP NOT NULL // to drop constraints
+
+Если коллона не соответствует условию, то мы не сможем применить ограничения
+Для этого сначала приведем ее к нужным нам отвветам
+
+UPDATE talks
+SET title = 'TBD'
+WHERE title IS NULL; // вот так мы заменили NULL to TBD и теперь можно применять ограничения
+
+//// We can use CHECK (We can add it in CREATE TABLE or ALTER TABLE)
+
+ALTER TABLE talks 
+ADD CHECK (estimated_length > 0);
+------->                 or                  <--------
+CREATE TABLE ...(
+estimated_length integer NOT NULL CHECK (estimated_length > 0)
+);
+//// in CHECK we can use all SQL requests like in WHERE path (IN, LIKE, AND, OR, ...)
+
+ALTER TABLE talks 
+ADD CHECK (estimated_length > 0 AND estimated_length < 120);
+ALTER TABLE talks
+ADD CHECK (estimated_length < 120 AND date_part('year', session_timeslot) = 2020); // date_part функция возвращает часть даты в виде целого числа 
+
+ALTER TABLE attendees
+ADD CHECK (standard_tickets_reserved + vip_tickets_reserved = total_tickets_reserved);
+//// using-unique-constraints
+
+ALTER TABLE attendees 
+ADD UNIQUE (email);
+
+ALTER TABLE talks
+ADD UNIQUE (speaker_id, session_timeslot) // один и тот же айди не может быть в неск session_timeslot одновременно
+
+CREATE TABLE registrations (
+    id integer NOT NULL,
+    attendee_id integer NOT NULL,
+    session_timeslot timestamp NOT NULL,
+    talk_id integer NOT NULL,
+    UNIQUE (attendee_id, session_timeslot)
+);
+///////////////////////////// more about pk
+
+ALTER TABLE speakers
+ADD PRIMARY KEY (id);
+
+INSERT INTO speakers (email, name, organization, title, years_in_role) 
+VALUES ('J.Saunders@ABCTech.com', 'Joan Saunders', 'ABC Tech.', 'Sr. Data Scientist', 6);// have an error
+
+INSERT INTO speakers (id, email, name, organization, title, years_in_role) 
+VALUES (1, 'J.Saunders@ABCTech.com', 'Joan Saunders', 'ABC Tech.', 'Sr. Data Scientist', 6);
+
+////////////////////////// more about FOREIGN KEY
+
+Ссылочная целостность может быть обеспечена путем добавления FOREIGN KEY к дочерней таблице, которая ссылается на первичный ключ родительской таблицы.
+
+ALTER TABLE registrations // дочерняя табл
+ADD FOREIGN KEY (talk_id)
+REFERENCES talks (id);
+-------> or <------------
+FOREIGN KEY (talk_id) REFERENCES talks (id)// if we create table
 
 
+ALTER TABLE talks
+ADD FOREIGN KEY (speaker_id)
+REFERENCES speakers (id);
 
+INSERT INTO talks VALUES (
+  21,
+  'Data Warehousing Best Practices',
+  101,
+  30,
+  '2020-08-15 18:00'
+); // error Key (speaker_id)=(101) is not present in table “speakers”.
 
+////////////////////////////// foreign-keys-cascading-changes
 
+REFERENCES talks (id) ON DELETE RESTRICT or REFERENCES talks (id) ON UPDATE RESTRICT // in CREATE TABLE
 
+OR
 
+ALTER TABLE registrations
+ADD FOREIGN KEY (talk_id)
+REFERENCES talks (id) ON DELETE CASCADE
+//
+ALTER TABLE talks
+ADD FOREIGN KEY (speaker_id)
+REFERENCES speakers (id) ON DELETE CASCADE;
 
+SELECT * FROM talks WHERE speaker_id = 2;
 
+DELETE FROM speakers 
+WHERE id = 2;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+SELECT * FROM talks WHERE speaker_id = 2;
 
 
 
