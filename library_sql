@@ -414,10 +414,216 @@ WHERE id = 2;
 
 SELECT * FROM talks WHERE speaker_id = 2;
 
+//////////////////////////////////////////////// index
+
+SELECT * FROM customers;
+
+SELECT *
+FROM pg_Indexes
+WHERE tablename/indexname/indexdef = 'customers'; // to find all indexs in table
+
+Чтобы понять, как PostgreSQL разбивает ваши операторы на выполняемые части, мы можем изучить план запроса, добавив его EXPLAIN ANALYZE перед запросом.
+
+EXPLAIN ANALYZE SELECT * FROM customers WHERE first_name = 'David';
+EXPLAIN ANALYZE SELECT * FROM customers WHERE last_name = 'Jones';
+
+CREATE INDEX customers_city_idx ON customers (city);
+//
+CREATE INDEX customers_last_name_first_name_idx ON customers (last_name, first_name); // Многоколоночные индексы
+
+EXPLAIN ANALYZE SELECT * FROM customers WHERE last_name = 'Jones' AND first_name = 'David';
+
+CREATE INDEX customers_last_name_first_name_idx ON customers (last_name, first_name);
+EXPLAIN ANALYZE SELECT * FROM customers WHERE last_name = 'Jones' AND first_name = 'David'; //faster
+////
+
+DROP INDEX IF EXISTS customers_last_name_idx; // to delete index
+
+// Если мы добавляем/удаляем/обнновляем сразу много чего и с ними связаны индексы, то лучше убрать их, тк это будет быстрее.
+
+SELECT pg_size_pretty (pg_total_relation_size('customers')); // to know weigth
+
+// чтобы индекс работал быстрее надо чтобы 1 значение исп чаще всего в нашей задаче + не надо создавать индекс только ради 1-го запроса
+
+SELECT NOW();
+ 
+\COPY orders FROM 'orders_add.txt' DELIMITER ',' CSV HEADER; // вот так можно вставить в бд инфу
+ 
+SELECT NOW();
+
+/////////////////////////////////////////  partial-index/ПРОМЕЖУТОЧНЫЕ ИНДЕКСЫ
+
+CREATE INDEX users_user_name_internal_idx ON users (user_name)
+WHERE email_address LIKE '%@wellsfargo.com';
+
+EXPLAIN ANALYZE SELECT * FROM customers WHERE years_old BETWEEN 13 AND 19;
+CREATE INDEX customers_years_old_teen_idx ON customers (years_old) WHERE years_old BETWEEN 13 AND 19;
+EXPLAIN ANALYZE SELECT * FROM customers WHERE years_old BETWEEN 13 AND 19; //faster
 
 
+ Если ваш столбец содержит значения NULL, вы также можете указать порядок их появления, 
+ добавив NULLS FIRST или NULLS LAST в соответствии с вашими потребностями.
+
+//// order by
+
+CREATE INDEX customers_state_name_email_address_idx ON customers (state_name, email_address);
+
+EXPLAIN ANALYZE SELECT state_name, email_address FROM customers WHERE state_name = 'California' OR state_name = 'Ohio' ORDER BY state_name DESC, email_address;
+
+CREATE INDEX customers_state_name_email_address_ordered_idx ON customers (state_name DESC, email_address ASC);
+
+EXPLAIN ANALYZE SELECT state_name, email_address FROM customers WHERE state_name = 'California' OR state_name = 'Ohio' ORDER BY state_name DESC, email_address; // faster
+
+///////// primary-keys-and-indexes
+
+стандарт индекса первичного ключа должен заканчиваться, _pkey
 
 
+////////////// clustered-index
+
+Кластерный индекс часто привязан к первичному ключу таблицы.
+ 
+Для кластеризации таблицы базы данных с использованием существующего индекса:
+CLUSTER table_name USING index_name;
+
+FOR EXAMPLE: CLUSTER customers USING customers_last_name_idx;
+
+Если вы уже установили, какой индекс следует кластеризовать, вы можете просто указать системе, к какой таблице применить кластер.
+
+CLUSTER products;
+
+И если вы хотите сгруппировать каждую таблицу в своей базе данных, которая имеет определенный индекс для использования, вы можете просто вызвать
+
+CLUSTER;
+
+
+///////////// ПРОМЕЖУТОЧНЫЕ ИНДЕКСЫ or non-clustered-index
+
+Некластеризованный индекс создает ключ для указанных вами столбцов и указатель на основную таблицу для любых столбцов, не являющихся частью индекса.
+вам не нужно делать ничего особенного при создании индекса, чтобы он не был кластеризованным.
+
+CREATE INDEX customers_state_name_idx ON customers (state_name);
+SELECT last_name, state_name FROM customers WHERE state_name = 'Texas' ORDER BY last_name;
+
+/////////////// index-only-scans or Сканирование только для индексации
+
+EXPLAIN ANALYZE SELECT first_name, last_name, email_address FROM customers WHERE last_name = 'Smith';
+CREATE INDEX customers_last_name_first_name_email_address_idx ON customers (last_name, first_name, email_address);
+EXPLAIN ANALYZE SELECT first_name, last_name, email_address FROM customers WHERE last_name = 'Smith'; // faster because we dont need to go to the actual table to find the information you are requesting.
+
+/////////////// combining-indexes or Объединение индексов
+
+EXPLAIN ANALYZE SELECT * FROM customers WHERE last_name = 'Jones' AND first_name = 'Steve';
+
+CREATE INDEX customers_last_name_first_name_idx ON customers (last_name, first_name); // its better idea of creating multi indeex if we need to have more that 2
+
+EXPLAIN ANALYZE SELECT * FROM customers WHERE last_name = 'Jones' AND first_name = 'Steve'; // faster
+
+///////////////// indexes-based-on-expressions (this indexes cost more)
+
+CREATE UNIQUE INDEX unique_manufacture_company_name_idx ON manufacture(LOWER(company_name)); <---- lower
+
+
+CREATE UNIQUE INDEX customers_email_address_lower_unique_idx ON customers (LOWER( email_address));
+INSERT INTO customers (first_name, last_name, email_address)
+VALUES ('bob', 'brown', 'test@sample.com'), ('Boris', 'Naishtut', 'Test@sample.com');  <---- we have an error
+
+
+///////////////////////////////////////////////////////////
+
+Чтобы создать новую таблицу из существующей, мы можем предшествовать любому запросу с помощью CREATE TABLE new_table_name AS. 
+Например, следующий код выбирает уникальные значения major_1 и major_1_credits_reqd из исходной college таблицы
+и вставки их в вновь созданную таблицу под названием majors:
+
+
+CREATE TABLE majors AS
+SELECT distinct major_1, major_1_credits_reqd
+FROM college;
+
+Используйте DISTINCT ключевое слово, чтобы включить только одну строку для каждого уникального основного направления
+////
+
+CREATE TABLE advisors AS
+SELECT distinct advisor_email, advisor_name, advisor_department
+FROM college;
+
+ALTER TABLE college
+DROP COLUMN advisor_name,
+DROP COLUMN advisor_department;
+
+SELECT * FROM advisors WHERE advisor_name = 'Brunson';
+////
+
+CREATE TABLE majors AS
+SELECT DISTINCT major_1, major_1_credits_reqd
+FROM college;
+
+CREATE TABLE students_majors AS
+SELECT major_1 as major, student_id
+FROM college
+UNION ALL
+SELECT major_2 as major, student_id
+FROM college
+WHERE major_2 IS NOT NULL;
+
+ALTER TABLE college
+DROP COLUMN major_1,
+DROP COLUMN major_1_credits_reqd,
+DROP COLUMN major_2,
+DROP COLUMN major_2_credits_reqd;
+
+SELECT * FROM students_majors ORDER BY student_id LIMIT 10;
+
+
+/////////////////////////// create a db list
+
+CREATE TABLE advisors (
+  id integer PRIMARY KEY,
+  email varchar(100) UNIQUE,
+  name varchar(100),
+  department varchar(100)
+);
+
+CREATE TABLE students (
+  id integer PRIMARY KEY,
+  name varchar(100),
+  year varchar(50),
+  email varchar(100) UNIQUE,
+  advisor_id integer REFERENCES advisors(id)
+);
+
+CREATE TABLE majors (
+  id integer PRIMARY KEY,
+  major varchar(100),
+  credits_reqd integer
+);
+
+CREATE TABLE students_majors (
+  student_id integer REFERENCES students(id),
+  major_id integer REFERENCES majors(id)
+);
+
+
+SELECT major, count(*)
+FROM students_majors, majors
+WHERE major_id = id
+GROUP BY major
+ORDER BY count DESC; // count of students in each sub
+
+// сколько студентов советуют факультет в каждой кафедре, мы должны присоединиться к students и advisors таблицам вместе:
+
+SELECT COUNT(students.id), advisors.department as advisor_department
+FROM students, advisors
+WHERE students.advisor_id = advisors.id
+GROUP BY advisor_department;
+
+// отправить студентам по электронной почте напоминание о количестве кредитов, необходимых для их специальности (-ей).
+
+SELECT student_id, SUM(credits_reqd) as total_credits, MIN(email) AS student_email
+FROM students, students_majors, majors
+WHERE students.id = students_majors.student_id
+AND students_majors.major_id = majors.id
+GROUP BY student_id;
 
 
 
